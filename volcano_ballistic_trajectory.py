@@ -32,13 +32,16 @@ def calculate_trajectory(g, rho_f, mu_f, D, m, theta, v0, time_step=0.001, max_t
         vy += ay * time_step
         x += vx * time_step
         y += vy * time_step
-        trajectory.append((t, v, Re, C, vx, vy, x, y))
+        trajectory.append((x, y))
         t += time_step
 
-    return np.array(trajectory, dtype=[
-        ('t', 'f4'), ('v', 'f4'), ('Re', 'f4'), ('C', 'f4'),
-        ('vx', 'f4'), ('vy', 'f4'), ('x', 'f4'), ('y', 'f4')
-    ])
+    return np.array(trajectory)
+
+# Initialize session state for shared data
+if "trajectories" not in st.session_state:
+    st.session_state.trajectories = []  # Store trajectories
+if "legend" not in st.session_state:
+    st.session_state.legend = []  # Store legend entries
 
 # Streamlit application
 st.title("Ballistic Trajectory Simulator")
@@ -53,24 +56,40 @@ m = st.sidebar.number_input("Mass (kg)", value=0.0218, step=0.0001)
 theta = st.sidebar.number_input("Launch Angle (°)", value=25.0, step=1.0)
 v0 = st.sidebar.number_input("Launch Velocity (m/s)", value=5.5, step=0.1)
 
-if st.sidebar.button("Simulate"):
+# Buttons
+col1, col2 = st.columns(2)
+simulate_btn = col1.button("Simulate")
+clear_btn = col2.button("Clear Figure")
+
+# Handle "Clear Figure" button
+if clear_btn:
+    st.session_state.trajectories = []
+    st.session_state.legend = []
+
+# Handle "Simulate" button
+if simulate_btn:
+    # Calculate trajectory
     trajectory = calculate_trajectory(g, rho_f, mu_f, D, m, theta, v0)
     
-    # Display results
-    st.subheader("Trajectory Data")
-    st.write(f"{'Time (s)':<10}{'Velocity (m/s)':<15}{'Re':<10}{'Drag Coeff.':<15}{'Vx (m/s)':<10}{'Vy (m/s)':<10}{'X (m)':<10}{'Y (m)':<10}")
-    for point in trajectory[:100]:  # Limit output to 100 rows
-        st.text(f"{point['t']:<10.3f}{point['v']:<15.3f}{point['Re']:<10.3f}{point['C']:<15.3f}{point['vx']:<10.3f}{point['vy']:<10.3f}{point['x']:<10.3f}{point['y']:<10.3f}")
-    
-    # Plot trajectory
-    x_values = trajectory['x']
-    y_values = trajectory['y']
-    
+    # Store trajectory and parameters for the legend
+    st.session_state.trajectories.append(trajectory)
+    st.session_state.legend.append(f"θ={theta}°, v₀={v0} m/s, D={D} m, m={m} kg")
+
+# Plot trajectories
+if st.session_state.trajectories:
     fig, ax = plt.subplots(figsize=(8, 6))
-    ax.plot(x_values, y_values, label="Trajectory")
+    
+    # Plot each trajectory
+    for i, traj in enumerate(st.session_state.trajectories):
+        x_values, y_values = traj[:, 0], traj[:, 1]
+        ax.plot(x_values, y_values, label=st.session_state.legend[i])
+    
+    # Configure plot
     ax.set_title("Ballistic Trajectory")
     ax.set_xlabel("Horizontal Distance (m)")
     ax.set_ylabel("Vertical Distance (m)")
     ax.grid()
-    ax.legend()
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), fancybox=True, shadow=True, ncol=2)
+    
+    # Display the plot
     st.pyplot(fig)
